@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
 from PyQt6.QtWidgets import QFrame, QVBoxLayout, QLabel
 
+from src.engine.validator import SUPPORTED_EXTENSIONS
 from src.ui.styles import Palette
 
 
@@ -18,9 +19,6 @@ class DropZoneState(Enum):
     SUCCESS = auto()
     ERROR = auto()
     MODEL_DOWNLOAD = auto()
-
-
-SUPPORTED_EXTENSIONS = {".m4a", ".mp4"}
 
 
 class DropZone(QFrame):
@@ -38,6 +36,9 @@ class DropZone(QFrame):
         super().__init__(parent)
         self._state = DropZoneState.IDLE
         self._palette = Palette()
+        self._error_timer = QTimer(self)
+        self._error_timer.setSingleShot(True)
+        self._error_timer.timeout.connect(lambda: self.set_state(DropZoneState.IDLE))
         self._setup_ui()
         self._apply_idle_style()
         self.setAcceptDrops(True)
@@ -77,7 +78,8 @@ class DropZone(QFrame):
             self._apply_success_style(message)
         elif state == DropZoneState.ERROR:
             self._apply_error_style(message)
-            QTimer.singleShot(4000, lambda: self.set_state(DropZoneState.IDLE))
+            self._error_timer.stop()
+            self._error_timer.start(4000)
         elif state == DropZoneState.MODEL_DOWNLOAD:
             self._apply_model_download_style(message)
 
@@ -86,9 +88,6 @@ class DropZone(QFrame):
         return self._state
 
     # ── 스타일 적용 ────────────────────────────────────────────
-
-    def _border_style(self, color: str, width: int = 1, style: str = "dashed") -> str:
-        return f"{width}px {style} {color}"
 
     def _apply_idle_style(self) -> None:
         p = self._palette

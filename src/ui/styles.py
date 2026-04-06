@@ -38,18 +38,24 @@ PROGRESS_TRACK_LIGHT = "#D1D1D6"
 PROGRESS_TRACK_DARK = "#3A3A3C"
 
 
+_dark_mode_cache: bool | None = None
+
+
 def is_dark_mode() -> bool:
     """macOS 시스템 다크 모드 여부를 반환한다."""
-    try:
-        result = subprocess.run(
-            ["defaults", "read", "-g", "AppleInterfaceStyle"],
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-        return result.stdout.strip() == "Dark"
-    except Exception:
-        return False
+    global _dark_mode_cache
+    if _dark_mode_cache is None:
+        try:
+            result = subprocess.run(
+                ["defaults", "read", "-g", "AppleInterfaceStyle"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            _dark_mode_cache = result.stdout.strip() == "Dark"
+        except Exception:
+            _dark_mode_cache = False
+    return _dark_mode_cache
 
 
 class Palette:

@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 from src.engine import run_transcription
 from src.engine.cancellation import CancellationToken
 from src.engine.whisper_runner import WhisperRunner
+from src.engine.writer import FileWriter
 from src.ui.drop_zone import DropZone, DropZoneState
 from src.ui.styles import Palette
 
@@ -56,7 +57,6 @@ class TranscriptionWorker(QThread):
     def cancel(self) -> None:
         """취소 요청 — 파이프라인 단계 간에서 InterruptedError 발생."""
         self._cancel_token.cancel()
-        self.wait(5000)
 
 
 class ModelDownloadWorker(QThread):
@@ -89,6 +89,9 @@ class MainWindow(QMainWindow):
         self._worker: Optional[TranscriptionWorker] = None
         self._download_worker: Optional[ModelDownloadWorker] = None
         self._output_path: Optional[str] = None
+        self._idle_timer = QTimer(self)
+        self._idle_timer.setSingleShot(True)
+        self._idle_timer.timeout.connect(self._reset_to_idle)
 
         self._setup_window()
         self._setup_ui()
@@ -176,7 +179,6 @@ class MainWindow(QMainWindow):
     # ── 키보드 단축키 ──────────────────────────────────────────
 
     def keyPressEvent(self, event) -> None:
-        from PyQt6.QtCore import Qt
         if event.key() == Qt.Key.Key_O and event.modifiers() == Qt.KeyboardModifier.MetaModifier:
             self._open_file_dialog()
         elif event.key() == Qt.Key.Key_Period and event.modifiers() == Qt.KeyboardModifier.MetaModifier:
@@ -202,7 +204,7 @@ class MainWindow(QMainWindow):
             return
 
         # 덮어쓰기 확인
-        output_path = file_path.rsplit(".", 1)[0] + ".txt"
+        output_path = FileWriter.derive_output_path(file_path)
         overwrite = False
         if os.path.exists(output_path):
             reply = QMessageBox.question(
@@ -217,6 +219,7 @@ class MainWindow(QMainWindow):
         self._start_transcription(file_path, overwrite)
 
     def _start_transcription(self, file_path: str, overwrite: bool) -> None:
+        self._idle_timer.stop()
         filename = os.path.basename(file_path)
         self._drop_zone.set_state(DropZoneState.PROCESSING, filename)
         self._progress_bar.setValue(0)
@@ -246,7 +249,7 @@ class MainWindow(QMainWindow):
         self._cancel_btn.hide()
         self._finder_btn.show()
         self._open_btn.show()
-        QTimer.singleShot(60000, self._reset_to_idle)
+        self._idle_timer.start(60000)
 
     def _on_transcription_cancelled(self) -> None:
         self._reset_to_idle()

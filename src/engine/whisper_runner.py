@@ -12,6 +12,17 @@ MODEL_NAME = "medium"
 
 
 class WhisperRunner:
+    _model = None
+    _model_device: Optional[str] = None
+
+    @classmethod
+    def _get_model(cls):
+        device = cls.get_device()
+        if cls._model is None or cls._model_device != device:
+            cls._model = whisper.load_model(MODEL_NAME, device=device)
+            cls._model_device = device
+        return cls._model
+
     @staticmethod
     def get_model_path() -> str:
         """Whisper 모델 캐시 파일 경로를 반환한다."""
@@ -66,8 +77,7 @@ class WhisperRunner:
             progress_callback(0)
 
         try:
-            device = WhisperRunner.get_device()
-            model = whisper.load_model(MODEL_NAME, device=device)
+            model = WhisperRunner._get_model()
         except Exception as e:
             raise WhisperModelError(
                 f"Whisper 모델 로딩에 실패했습니다. 앱을 재시작해 주세요: {e}"

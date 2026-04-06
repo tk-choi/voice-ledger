@@ -96,7 +96,6 @@ class AudioConverter:
             yield path
         finally:
             try:
-                if os.path.exists(path):
-                    os.remove(path)
+                os.remove(path)
             except OSError:
                 pass

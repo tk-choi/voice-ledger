@@ -45,8 +45,6 @@ def run_transcription(
 
     # 2. 출력 경로 확인
     output_path = writer.FileWriter.derive_output_path(input_path)
-    if writer.FileWriter.check_existing(output_path) and not overwrite:
-        raise FileExistsError(f"파일이 이미 존재합니다: {output_path}")
     _check_cancel()
 
     # 3. WAV 변환 → Whisper 변환 (임시 파일은 컨텍스트 매니저가 보장)
@@ -64,6 +62,6 @@ def run_transcription(
 
     # 4. 포맷 → 저장
     lines = formatter.OutputFormatter.format_segments(segments)
-    writer.FileWriter.write(lines, output_path, overwrite=True)
+    writer.FileWriter.write(lines, output_path, overwrite=overwrite)
 
     return output_path

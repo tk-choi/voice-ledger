@@ -45,6 +45,10 @@ class TestGetDevice:
 
 
 class TestTranscribe:
+    def setup_method(self):
+        WhisperRunner._model = None
+        WhisperRunner._model_device = None
+
     def _make_mock_model(self, segments=None):
         if segments is None:
             segments = [
