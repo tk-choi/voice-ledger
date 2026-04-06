@@ -1,0 +1,118 @@
+# ===========================
+# Python
+# ===========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+.Python
+
+# 가상환경
+.venv/
+venv/
+ENV/
+env/
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ===========================
+# PyTorch / ML 모델
+# ===========================
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+
+# Whisper 캐시 (홈 디렉토리에 저장되지만 혹시 프로젝트 내 존재 시)
+*.model
+models/
+
+# ===========================
+# 오디오 / 미디어 파일
+# ===========================
+*.wav
+*.mp3
+*.m4a
+*.mp4
+*.aac
+*.flac
+*.ogg
+*.wma
+
+# ===========================
+# 출력 / 변환 파일
+# ===========================
+output/
+temp/
+tmp/
+*.txt.bak
+transcripts/
+
+# ===========================
+# macOS
+# ===========================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# ===========================
+# IDE / 에디터
+# ===========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# ===========================
+# 환경 변수 / 시크릿
+# ===========================
+.env
+.env.*
+*.key
+secrets.json
+
+# ===========================
+# 로그
+# ===========================
+*.log
+logs/
+
+# ===========================
+# OMC (oh-my-claudecode) 내부 상태
+# ===========================
+.omc/state/
+.omc/sessions/
+
+# ===========================
+# pytest / 테스트 커버리지
+# ===========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ===========================
+# FFmpeg
+# ===========================
+vendor/ffmpeg
