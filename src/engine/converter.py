@@ -42,12 +42,15 @@ class AudioConverter:
                 ],
                 capture_output=True,
                 text=True,
+                timeout=30,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 raise FFmpegConversionError(
                     f"오디오 길이를 측정할 수 없습니다: {result.stderr}"
                 )
             return float(result.stdout.strip())
+        except subprocess.TimeoutExpired as e:
+            raise FFmpegConversionError("오디오 처리 시간이 초과되었습니다.") from e
         except FileNotFoundError as e:
             raise FFmpegNotFoundError(
                 "ffmpeg/ffprobe를 찾을 수 없습니다. brew install ffmpeg를 실행해 주세요."
@@ -76,7 +79,10 @@ class AudioConverter:
                 ],
                 check=True,
                 capture_output=True,
+                timeout=300,
             )
+        except subprocess.TimeoutExpired as e:
+            raise FFmpegConversionError("오디오 처리 시간이 초과되었습니다.") from e
         except FileNotFoundError as e:
             raise FFmpegNotFoundError(
                 "ffmpeg를 찾을 수 없습니다. brew install ffmpeg를 실행해 주세요."

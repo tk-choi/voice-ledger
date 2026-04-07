@@ -66,7 +66,7 @@ class TestRunTranscription:
         mock_model = MagicMock()
         mock_model.transcribe.side_effect = RuntimeError("whisper 오류")
 
-        with patch("whisper.load_model", return_value=mock_model):
+        with patch("src.engine.whisper_runner.WhisperRunner._get_model", return_value=mock_model):
             with patch("subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0, stdout="10.0\n")
                 with pytest.raises(Exception):

@@ -32,14 +32,26 @@ class TestGetModelPath:
 
 
 class TestGetDevice:
-    def test_returns_mps_when_available(self):
-        with patch("torch.backends.mps.is_available", return_value=True):
-            with patch("torch.backends.mps.is_built", return_value=True):
-                device = WhisperRunner.get_device()
-                assert device in ("mps", "cpu")  # fallback 허용
+    def test_returns_mps_when_available_and_built(self):
+        with patch("torch.backends.mps.is_available", return_value=True), \
+             patch("torch.backends.mps.is_built", return_value=True):
+            device = WhisperRunner.get_device()
+            assert device == "mps"
 
-    def test_returns_cpu_when_mps_unavailable(self):
-        with patch("torch.backends.mps.is_available", return_value=False):
+    def test_returns_cpu_when_mps_not_available(self):
+        with patch("torch.backends.mps.is_available", return_value=False), \
+             patch("torch.backends.mps.is_built", return_value=True):
+            device = WhisperRunner.get_device()
+            assert device == "cpu"
+
+    def test_returns_cpu_when_mps_not_built(self):
+        with patch("torch.backends.mps.is_available", return_value=True), \
+             patch("torch.backends.mps.is_built", return_value=False):
+            device = WhisperRunner.get_device()
+            assert device == "cpu"
+
+    def test_returns_cpu_when_mps_raises(self):
+        with patch("torch.backends.mps.is_available", side_effect=Exception("no mps")):
             device = WhisperRunner.get_device()
             assert device == "cpu"
 
@@ -127,6 +139,41 @@ class TestTranscribe:
         with patch("whisper.load_model", return_value=mock_model):
             with pytest.raises(InterruptedError):
                 WhisperRunner.transcribe(str(audio), duration=10.0, cancel_token=token)
+
+    def test_transcribe_calls_model_with_fp16_false_on_mps(self, tmp_path):
+        audio = tmp_path / "audio.wav"
+        audio.write_bytes(b"dummy")
+        mock_model = self._make_mock_model()
+        with patch("whisper.load_model", return_value=mock_model), \
+             patch("torch.backends.mps.is_available", return_value=True), \
+             patch("torch.backends.mps.is_built", return_value=True):
+            WhisperRunner.transcribe(str(audio), duration=10.0)
+            call_kwargs = mock_model.transcribe.call_args[1]
+            assert call_kwargs.get("fp16") is False
+
+    def test_transcribe_calls_model_with_fp16_false_on_cpu(self, tmp_path):
+        audio = tmp_path / "audio.wav"
+        audio.write_bytes(b"dummy")
+        mock_model = self._make_mock_model()
+        with patch("whisper.load_model", return_value=mock_model), \
+             patch("torch.backends.mps.is_available", return_value=False):
+            WhisperRunner.transcribe(str(audio), duration=10.0)
+            call_kwargs = mock_model.transcribe.call_args[1]
+            assert call_kwargs.get("fp16") is False
+
+    def test_progress_callback_called_with_0_and_100(self, tmp_path):
+        audio = tmp_path / "audio.wav"
+        audio.write_bytes(b"dummy")
+        mock_model = self._make_mock_model()
+        progress_values = []
+        with patch("whisper.load_model", return_value=mock_model):
+            WhisperRunner.transcribe(
+                str(audio),
+                duration=10.0,
+                progress_callback=lambda p: progress_values.append(p),
+            )
+        assert progress_values[0] == 0
+        assert progress_values[-1] == 100
 
     def test_no_pyqt6_import_in_module(self):
         import ast

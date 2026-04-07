@@ -87,7 +87,9 @@ class WhisperRunner:
             raise InterruptedError("변환이 취소되었습니다.")
 
         try:
-            result = model.transcribe(audio_path, language=None, verbose=False)
+            device = WhisperRunner.get_device()
+            fp16 = (device == "cuda")
+            result = model.transcribe(audio_path, language=None, verbose=False, fp16=fp16)
             segments = result.get("segments", [])
         except Exception as e:
             raise WhisperTranscribeError(

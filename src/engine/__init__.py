@@ -43,8 +43,10 @@ def run_transcription(
     validator.FileValidator.validate(input_path)
     _check_cancel()
 
-    # 2. 출력 경로 확인
+    # 2. 출력 경로 확인 및 덮어쓰기 검사 (변환 전에 수행)
     output_path = writer.FileWriter.derive_output_path(input_path)
+    if not overwrite and writer.FileWriter.check_existing(output_path):
+        raise FileExistsError(f"파일이 이미 존재합니다: {output_path}")
     _check_cancel()
 
     # 3. WAV 변환 → Whisper 변환 (임시 파일은 컨텍스트 매니저가 보장)
