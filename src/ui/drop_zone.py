@@ -16,6 +16,7 @@ class DropZoneState(Enum):
     IDLE = auto()
     DRAG_HOVER = auto()
     PROCESSING = auto()
+    CANCELLING = auto()
     SUCCESS = auto()
     ERROR = auto()
     MODEL_DOWNLOAD = auto()
@@ -74,6 +75,8 @@ class DropZone(QFrame):
             self._apply_hover_style()
         elif state == DropZoneState.PROCESSING:
             self._apply_processing_style(message)
+        elif state == DropZoneState.CANCELLING:
+            self._apply_cancelling_style(message)
         elif state == DropZoneState.SUCCESS:
             self._apply_success_style(message)
         elif state == DropZoneState.ERROR:
@@ -169,6 +172,23 @@ class DropZone(QFrame):
         self._main_label.setText(message or "오류가 발생했습니다")
         self._main_label.setStyleSheet(f"font-size: 12px; color: {p.error()};")
         self._sub_label.setText("4초 후 자동으로 돌아갑니다")
+        self._sub_label.setStyleSheet(f"font-size: 11px; color: {p.text_tertiary()};")
+        self.setAcceptDrops(False)
+
+    def _apply_cancelling_style(self, message: str = "") -> None:
+        p = self._palette
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {p.dropzone_bg()};
+                border: 1px solid {p.text_tertiary()};
+                border-radius: 8px;
+            }}
+        """)
+        self._icon_label.setText("◎")
+        self._icon_label.setStyleSheet(f"font-size: 32px; color: {p.text_secondary()};")
+        self._main_label.setText("취소 중")
+        self._main_label.setStyleSheet(f"font-size: 13px; color: {p.text_secondary()};")
+        self._sub_label.setText(message or "정리하는 중이에요")
         self._sub_label.setStyleSheet(f"font-size: 11px; color: {p.text_tertiary()};")
         self.setAcceptDrops(False)
 
