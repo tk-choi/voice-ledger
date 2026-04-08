@@ -8,7 +8,7 @@
 - **드래그앤드롭** — `.m4a`, `.mp4` 파일을 창에 드롭하면 즉시 변환 시작
 - **완전 오프라인** — 최초 모델 다운로드 이후 인터넷 불필요
 - **다국어 자동 감지** — 한국어·영어(혼합 포함) 자동 인식
-- **Apple Silicon 최적화** — MPS 가속으로 M1/M2/M3/M4에서 빠른 변환
+- **Apple Silicon 최적화** — CTranslate2 INT8 최적화로 M1/M2/M3/M4에서 빠른 변환
 - **타임스탬프 출력** — `[HH:MM:SS]` 형식으로 세그먼트별 기록
 - **취소 지원** — 변환 중 언제든 취소 가능, 임시 파일 자동 정리
 
@@ -55,14 +55,14 @@ pip install .
 ### 4. 앱 실행
 
 ```bash
-uv run python -m src.main
+PYTHONPATH=. uv run python src/main.py
 # 또는
-python -m src.main
+PYTHONPATH=. python src/main.py
 ```
 
 > [!NOTE]
-> 최초 실행 시 Whisper medium 모델(~1.5 GB)을 자동으로 다운로드합니다.  
-> 다운로드는 한 번만 수행되며, 이후 `~/.cache/whisper/`에 캐시됩니다.
+> 최초 실행 시 Whisper large-v3 모델(~3 GB)을 자동으로 다운로드합니다.  
+> 다운로드는 한 번만 수행되며, 이후 `~/.cache/huggingface/hub/`에 캐시됩니다.
 
 ## 사용 방법
 
@@ -97,7 +97,7 @@ GUI Layer (PyQt6)
 Transcription Engine
     ├─ FileValidator   — 확장자·파일 크기 검증
     ├─ AudioConverter  — ffmpeg: m4a/mp4 → 16kHz mono WAV
-    ├─ WhisperRunner   — Whisper medium 로컬 추론 (MPS/CPU)
+    ├─ WhisperRunner   — faster-whisper large-v3 로컬 추론 (INT8/CPU)
     ├─ OutputFormatter — 세그먼트 → [HH:MM:SS] 형식
     └─ FileWriter      — UTF-8 .txt 저장
 ```
@@ -124,7 +124,7 @@ python -m pytest tests/ -v
 | 역할 | 라이브러리 |
 |------|-----------|
 | GUI | PyQt6 |
-| 음성 인식 | openai-whisper (medium 모델) |
-| 딥러닝 백엔드 | PyTorch (MPS / CPU) |
+| 음성 인식 | faster-whisper (large-v3 모델, INT8) |
+| 딥러닝 백엔드 | CTranslate2 |
 | 오디오 처리 | ffmpeg |
 | 테스트 | pytest |
