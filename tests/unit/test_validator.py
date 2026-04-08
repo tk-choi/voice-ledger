@@ -1,5 +1,4 @@
 """FileValidator 단위 테스트"""
-import os
 import pytest
 from src.engine.exceptions import UnsupportedFormatError
 from src.engine.validator import FileValidator

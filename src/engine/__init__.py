@@ -72,17 +72,23 @@ def run_transcription(
 
         _emit_stage("transcribing")
         duration = converter.AudioConverter.get_duration(wav_path)
+
+        def _map_progress(p):
+            mapped = 10 + int(p * 0.79)  # 0-100 → 10-89
+            _emit_progress(min(mapped, 89))
+
         segments = whisper_runner.WhisperRunner.transcribe(
-            wav_path,
-            duration=duration,
-            progress_callback=_emit_progress,
+            wav_path, duration=duration,
+            progress_callback=_map_progress,
             cancel_token=cancel_token,
         )
+        _emit_progress(90)
 
     # 4. 포맷 → 저장
     _emit_stage("saving")
     _emit_progress(95)
     lines = formatter.OutputFormatter.format_segments(segments)
     writer.FileWriter.write(lines, output_path, overwrite=overwrite)
+    _emit_progress(100)
 
     return output_path

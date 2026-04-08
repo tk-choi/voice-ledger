@@ -1,7 +1,6 @@
 """Engine 파이프라인 단위 테스트 (모든 의존성 mock)"""
-import os
 from contextlib import contextmanager
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch
 import pytest
 
 from src.engine import run_transcription

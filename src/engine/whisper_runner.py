@@ -2,50 +2,36 @@
 import os
 from typing import Callable, Optional
 
-import torch
-import whisper
+from faster_whisper import WhisperModel
 
 from src.engine.exceptions import WhisperModelError, WhisperTranscribeError
 from src.engine.cancellation import CancellationToken
 
-MODEL_NAME = "medium"
+MODEL_NAME = "large-v3"
 
 
 class WhisperRunner:
     _model = None
-    _model_device: Optional[str] = None
 
     @classmethod
     def _get_model(cls):
-        device = cls.get_device()
-        if cls._model is None or cls._model_device != device:
-            cls._model = whisper.load_model(MODEL_NAME, device=device)
-            cls._model_device = device
+        if cls._model is None:
+            cls._model = WhisperModel(MODEL_NAME, device="auto", compute_type="int8")
         return cls._model
 
     @staticmethod
     def get_model_path() -> str:
-        """Whisper 모델 캐시 파일 경로를 반환한다."""
-        cache_dir = os.path.expanduser("~/.cache/whisper")
-        return os.path.join(cache_dir, f"{MODEL_NAME}.pt")
+        """faster-whisper 모델 캐시 디렉토리 경로를 반환한다."""
+        return os.path.expanduser(
+            f"~/.cache/huggingface/hub/models--Systran--faster-whisper-{MODEL_NAME}/"
+        )
 
     @staticmethod
     def is_model_available() -> bool:
-        """Whisper medium 모델이 로컬에 캐시되어 있는지 확인한다."""
-        return os.path.exists(WhisperRunner.get_model_path())
-
-    @staticmethod
-    def get_device() -> str:
-        """사용 가능한 최적 디바이스를 반환한다 (mps > cpu)."""
-        try:
-            if (
-                torch.backends.mps.is_available()
-                and torch.backends.mps.is_built()
-            ):
-                return "mps"
-        except Exception:
-            pass
-        return "cpu"
+        """faster-whisper large-v3 모델이 로컬에 캐시되어 있는지 확인한다."""
+        model_path = WhisperRunner.get_model_path()
+        snapshots_path = os.path.join(model_path, "snapshots")
+        return os.path.isdir(snapshots_path)
 
     @staticmethod
     def transcribe(
@@ -54,16 +40,16 @@ class WhisperRunner:
         progress_callback: Optional[Callable[[int], None]] = None,
         cancel_token: Optional[CancellationToken] = None,
     ) -> list[dict]:
-        """WAV 파일을 Whisper로 변환하여 세그먼트 리스트를 반환한다.
+        """WAV 파일을 faster-whisper로 변환하여 세그먼트 리스트를 반환한다.
 
         Args:
             audio_path: 입력 WAV 파일 경로
             duration: 오디오 총 길이 (초). 진행률 계산에 사용.
-            progress_callback: 진행률(0-100) 콜백. Engine 레이어에서 Qt 의존 없음.
-            cancel_token: 취소 토큰. transcribe 시작 전 is_cancelled 체크.
+            progress_callback: 진행률(0-100) 콜백. 세그먼트별 실시간 호출.
+            cancel_token: 취소 토큰. 세그먼트 사이에 is_cancelled 체크.
 
         Returns:
-            Whisper 세그먼트 리스트 [{"start": float, "end": float, "text": str}, ...]
+            세그먼트 리스트 [{"start": float, "end": float, "text": str}, ...]
 
         Raises:
             InterruptedError: cancel_token이 취소된 경우
@@ -87,10 +73,24 @@ class WhisperRunner:
             raise InterruptedError("변환이 취소되었습니다.")
 
         try:
-            device = WhisperRunner.get_device()
-            fp16 = (device == "cuda")
-            result = model.transcribe(audio_path, language=None, verbose=False, fp16=fp16)
-            segments = result.get("segments", [])
+            segments_gen, _info = model.transcribe(
+                audio_path, beam_size=5, language=None, vad_filter=True
+            )
+            segments = []
+            last_pct = -1
+            for segment in segments_gen:
+                if cancel_token and cancel_token.is_cancelled:
+                    raise InterruptedError("변환이 취소되었습니다.")
+                segments.append(
+                    {"start": segment.start, "end": segment.end, "text": segment.text}
+                )
+                if progress_callback and duration > 0:
+                    pct = min(int(segment.end / duration * 100), 100)
+                    if pct != last_pct:
+                        progress_callback(pct)
+                        last_pct = pct
+        except InterruptedError:
+            raise
         except Exception as e:
             raise WhisperTranscribeError(
                 f"변환 중 문제가 발생했습니다: {e}"

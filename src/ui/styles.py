@@ -1,6 +1,5 @@
 """Voice Ledger 디자인 시스템 — Precision Design System"""
 import subprocess
-from PyQt6.QtGui import QColor
 
 
 # ── Apple Blue 액센트 ──────────────────────────────────────────

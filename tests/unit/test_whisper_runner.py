@@ -1,5 +1,5 @@
 """WhisperRunner 단위 테스트 (mock 기반)"""
-import os
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 import pytest
 from src.engine.exceptions import WhisperModelError, WhisperTranscribeError
@@ -8,15 +8,16 @@ from src.engine.whisper_runner import WhisperRunner
 
 
 class TestIsModelAvailable:
-    def test_returns_true_when_model_file_exists(self, tmp_path):
-        model_file = tmp_path / "medium.pt"
-        model_file.write_bytes(b"fake model")
-        with patch.object(WhisperRunner, "get_model_path", return_value=str(model_file)):
+    def test_returns_true_when_snapshots_dir_exists(self, tmp_path):
+        model_dir = tmp_path / "model"
+        snapshots_dir = model_dir / "snapshots"
+        snapshots_dir.mkdir(parents=True)
+        with patch.object(WhisperRunner, "get_model_path", return_value=str(model_dir)):
             assert WhisperRunner.is_model_available() is True
 
-    def test_returns_false_when_model_missing(self, tmp_path):
-        missing_path = str(tmp_path / "medium.pt")
-        with patch.object(WhisperRunner, "get_model_path", return_value=missing_path):
+    def test_returns_false_when_snapshots_dir_missing(self, tmp_path):
+        model_dir = str(tmp_path / "model")
+        with patch.object(WhisperRunner, "get_model_path", return_value=model_dir):
             assert WhisperRunner.is_model_available() is False
 
 
@@ -25,57 +26,35 @@ class TestGetModelPath:
         path = WhisperRunner.get_model_path()
         assert isinstance(path, str)
 
-    def test_path_contains_whisper_and_medium(self):
+    def test_path_contains_huggingface_and_large_v3(self):
         path = WhisperRunner.get_model_path()
-        assert "whisper" in path.lower()
-        assert "medium" in path
-
-
-class TestGetDevice:
-    def test_returns_mps_when_available_and_built(self):
-        with patch("torch.backends.mps.is_available", return_value=True), \
-             patch("torch.backends.mps.is_built", return_value=True):
-            device = WhisperRunner.get_device()
-            assert device == "mps"
-
-    def test_returns_cpu_when_mps_not_available(self):
-        with patch("torch.backends.mps.is_available", return_value=False), \
-             patch("torch.backends.mps.is_built", return_value=True):
-            device = WhisperRunner.get_device()
-            assert device == "cpu"
-
-    def test_returns_cpu_when_mps_not_built(self):
-        with patch("torch.backends.mps.is_available", return_value=True), \
-             patch("torch.backends.mps.is_built", return_value=False):
-            device = WhisperRunner.get_device()
-            assert device == "cpu"
-
-    def test_returns_cpu_when_mps_raises(self):
-        with patch("torch.backends.mps.is_available", side_effect=Exception("no mps")):
-            device = WhisperRunner.get_device()
-            assert device == "cpu"
+        assert "huggingface" in path.lower()
+        assert "large-v3" in path
 
 
 class TestTranscribe:
     def setup_method(self):
         WhisperRunner._model = None
-        WhisperRunner._model_device = None
 
-    def _make_mock_model(self, segments=None):
+    def _make_mock_segments(self, segments=None):
         if segments is None:
             segments = [
-                {"start": 0.0, "end": 5.0, "text": "안녕하세요"},
-                {"start": 5.0, "end": 10.0, "text": "테스트입니다"},
+                SimpleNamespace(start=0.0, end=5.0, text="안녕하세요"),
+                SimpleNamespace(start=5.0, end=10.0, text="테스트입니다"),
             ]
+        info = SimpleNamespace(language="ko", language_probability=0.95, duration=10.0)
+        return (iter(segments), info)
+
+    def _make_mock_model(self, segments=None):
         mock_model = MagicMock()
-        mock_model.transcribe.return_value = {"segments": segments}
+        mock_model.transcribe.return_value = self._make_mock_segments(segments)
         return mock_model
 
     def test_returns_segments_list(self, tmp_path):
         audio = tmp_path / "audio.wav"
         audio.write_bytes(b"dummy")
         mock_model = self._make_mock_model()
-        with patch("whisper.load_model", return_value=mock_model):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=mock_model):
             result = WhisperRunner.transcribe(str(audio), duration=10.0)
             assert isinstance(result, list)
             assert len(result) == 2
@@ -84,28 +63,28 @@ class TestTranscribe:
         audio = tmp_path / "audio.wav"
         audio.write_bytes(b"dummy")
         mock_model = self._make_mock_model()
-        with patch("whisper.load_model", return_value=mock_model):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=mock_model):
             result = WhisperRunner.transcribe(str(audio), duration=10.0)
             for seg in result:
                 assert "start" in seg
                 assert "end" in seg
                 assert "text" in seg
 
-    def test_loads_medium_model(self, tmp_path):
+    def test_loads_large_v3_model(self, tmp_path):
         audio = tmp_path / "audio.wav"
         audio.write_bytes(b"dummy")
         mock_model = self._make_mock_model()
-        with patch("whisper.load_model", return_value=mock_model) as mock_load:
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=mock_model) as mock_cls:
             WhisperRunner.transcribe(str(audio), duration=10.0)
-            call_args = mock_load.call_args
-            assert call_args[0][0] == "medium"
+            call_args = mock_cls.call_args
+            assert call_args[0][0] == "large-v3"
 
     def test_calls_progress_callback(self, tmp_path):
         audio = tmp_path / "audio.wav"
         audio.write_bytes(b"dummy")
         mock_model = self._make_mock_model()
         progress_values = []
-        with patch("whisper.load_model", return_value=mock_model):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=mock_model):
             WhisperRunner.transcribe(
                 str(audio),
                 duration=10.0,
@@ -117,7 +96,7 @@ class TestTranscribe:
     def test_model_load_failure_raises_whisper_model_error(self, tmp_path):
         audio = tmp_path / "audio.wav"
         audio.write_bytes(b"dummy")
-        with patch("whisper.load_model", side_effect=RuntimeError("모델 로딩 실패")):
+        with patch("src.engine.whisper_runner.WhisperModel", side_effect=RuntimeError("모델 로딩 실패")):
             with pytest.raises(WhisperModelError):
                 WhisperRunner.transcribe(str(audio), duration=10.0)
 
@@ -126,7 +105,7 @@ class TestTranscribe:
         audio.write_bytes(b"dummy")
         mock_model = MagicMock()
         mock_model.transcribe.side_effect = RuntimeError("변환 중 오류")
-        with patch("whisper.load_model", return_value=mock_model):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=mock_model):
             with pytest.raises(WhisperTranscribeError):
                 WhisperRunner.transcribe(str(audio), duration=10.0)
 
@@ -136,37 +115,16 @@ class TestTranscribe:
         mock_model = self._make_mock_model()
         token = CancellationToken()
         token.cancel()
-        with patch("whisper.load_model", return_value=mock_model):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=mock_model):
             with pytest.raises(InterruptedError):
                 WhisperRunner.transcribe(str(audio), duration=10.0, cancel_token=token)
-
-    def test_transcribe_calls_model_with_fp16_false_on_mps(self, tmp_path):
-        audio = tmp_path / "audio.wav"
-        audio.write_bytes(b"dummy")
-        mock_model = self._make_mock_model()
-        with patch("whisper.load_model", return_value=mock_model), \
-             patch("torch.backends.mps.is_available", return_value=True), \
-             patch("torch.backends.mps.is_built", return_value=True):
-            WhisperRunner.transcribe(str(audio), duration=10.0)
-            call_kwargs = mock_model.transcribe.call_args[1]
-            assert call_kwargs.get("fp16") is False
-
-    def test_transcribe_calls_model_with_fp16_false_on_cpu(self, tmp_path):
-        audio = tmp_path / "audio.wav"
-        audio.write_bytes(b"dummy")
-        mock_model = self._make_mock_model()
-        with patch("whisper.load_model", return_value=mock_model), \
-             patch("torch.backends.mps.is_available", return_value=False):
-            WhisperRunner.transcribe(str(audio), duration=10.0)
-            call_kwargs = mock_model.transcribe.call_args[1]
-            assert call_kwargs.get("fp16") is False
 
     def test_progress_callback_called_with_0_and_100(self, tmp_path):
         audio = tmp_path / "audio.wav"
         audio.write_bytes(b"dummy")
         mock_model = self._make_mock_model()
         progress_values = []
-        with patch("whisper.load_model", return_value=mock_model):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=mock_model):
             WhisperRunner.transcribe(
                 str(audio),
                 duration=10.0,

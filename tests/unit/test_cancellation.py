@@ -1,5 +1,4 @@
 """CancellationToken 단위 테스트"""
-import pytest
 from src.engine.cancellation import CancellationToken
 
 

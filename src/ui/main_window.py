@@ -7,6 +7,7 @@ import random
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QProgressBar, QMessageBox, QFileDialog,
@@ -107,11 +108,11 @@ class ModelDownloadWorker(QThread):
 
     def run(self) -> None:
         try:
-            import whisper
-            # whisper.load_model이 자동으로 다운로드 수행
-            # 진행률은 추정값으로 표시 (whisper 내부 콜백 없음)
+            from faster_whisper import WhisperModel
+            # WhisperModel 생성 시 huggingface hub에서 자동 다운로드
+            # 진행률은 추정값으로 표시 (faster-whisper 내부 콜백 없음)
             self.progress.emit(10)
-            whisper.load_model("medium")
+            WhisperModel("large-v3", device="auto", compute_type="int8")
             self.progress.emit(100)
             self.finished.emit()
         except Exception as e:
@@ -287,7 +288,10 @@ class MainWindow(QMainWindow):
         filename = os.path.basename(file_path)
         self._drop_zone.set_state(DropZoneState.PROCESSING, filename)
         self._progress_bar.setValue(0)
-        self._progress_bar.setStyleSheet("")
+        p = self._palette
+        self._progress_bar.setStyleSheet(
+            f"QProgressBar {{ background-color: {p.progress_track()}; border-radius: 3px; }}"
+        )
         self._progress_bar.show()
         self._status_label.setText("파일을 확인하고 있어요")
         self._status_label.show()
@@ -314,6 +318,7 @@ class MainWindow(QMainWindow):
         self._progress_bar.setValue(100)
         p = self._palette
         self._progress_bar.setStyleSheet(
+            f"QProgressBar {{ background-color: {p.progress_track()}; border-radius: 3px; }}"
             f"QProgressBar::chunk {{ background-color: {p.success()}; border-radius: 3px; }}"
         )
         self._status_label.setText(f"완료 — {output_path}")
@@ -369,8 +374,9 @@ class MainWindow(QMainWindow):
     # ── 진행률 UX ─────────────────────────────────────────────────
 
     def _on_progress_updated(self, value: int) -> None:
-        """엔진에서 진행률이 업데이트될 때 호출."""
-        self._progress_bar.setValue(value)
+        """엔진에서 진행률이 업데이트될 때 호출. 단조증가만 허용."""
+        if value > self._progress_bar.value():
+            self._progress_bar.setValue(value)
 
     def _on_stage_changed(self, stage: str) -> None:
         """엔진에서 파이프라인 단계가 바뀔 때 호출."""
@@ -415,7 +421,9 @@ class MainWindow(QMainWindow):
         if rgb == self._last_pulse_rgb:
             return
         self._last_pulse_rgb = rgb
+        track = self._palette.progress_track()
         self._progress_bar.setStyleSheet(
+            f"QProgressBar {{ background-color: {track}; border-radius: 3px; }}"
             f"QProgressBar::chunk {{ background-color: rgb({r}, {g}, {b}); border-radius: 3px; }}"
         )
 
@@ -430,6 +438,17 @@ class MainWindow(QMainWindow):
         self._message_timer.stop()
         self._pulse_timer.stop()
         self._cancel_dot_timer.stop()
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+        """macOS 닫기 버튼 클릭 시 앱을 완전히 종료."""
+        self._stop_all_animation_timers()
+        self._idle_timer.stop()
+        if self._worker and self._worker.isRunning():
+            self._worker.cancel()
+            self._worker.wait(3000)
+        if self._download_worker and self._download_worker.isRunning():
+            self._download_worker.wait(3000)
+        event.accept()
 
     # ── 완료 후 액션 ───────────────────────────────────────────
 
@@ -467,7 +486,7 @@ class MainWindow(QMainWindow):
         self._progress_bar.setValue(value)
         self._drop_zone.set_state(
             DropZoneState.MODEL_DOWNLOAD,
-            f"Whisper medium 모델 다운로드 중... (~1.5 GB)"
+            "Whisper large-v3 모델 다운로드 중... (~3 GB)"
         )
 
     def _on_download_finished(self) -> None:

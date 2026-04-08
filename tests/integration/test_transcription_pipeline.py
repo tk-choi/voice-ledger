@@ -1,31 +1,34 @@
 """Engine 파이프라인 통합 테스트 (whisper mock)"""
 import os
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 import pytest
 from src.engine import run_transcription
 from src.engine.cancellation import CancellationToken
 
 
-SAMPLE_SEGMENTS = [
-    {"start": 0.0, "end": 5.0, "text": "안녕하세요"},
-    {"start": 5.0, "end": 10.0, "text": "테스트입니다"},
-]
-
-
 def make_mock_whisper(segments=None):
     if segments is None:
-        segments = SAMPLE_SEGMENTS
+        segments = [
+            SimpleNamespace(start=0.0, end=5.0, text="안녕하세요"),
+            SimpleNamespace(start=5.0, end=10.0, text="테스트입니다"),
+        ]
+    info = SimpleNamespace(language="ko", language_probability=0.95, duration=10.0)
     mock_model = MagicMock()
-    mock_model.transcribe.return_value = {"segments": segments}
+    mock_model.transcribe.return_value = (iter(segments), info)
     return mock_model
 
 
 class TestRunTranscription:
+    def setup_method(self):
+        from src.engine.whisper_runner import WhisperRunner
+        WhisperRunner._model = None
+
     def test_creates_txt_file(self, tmp_path):
         input_file = tmp_path / "audio.m4a"
         input_file.write_bytes(b"dummy audio")
 
-        with patch("whisper.load_model", return_value=make_mock_whisper()):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=make_mock_whisper()):
             with patch("subprocess.run") as mock_run:
                 # to_wav 성공 mock
                 mock_run.return_value = MagicMock(returncode=0, stdout="10.0\n")
@@ -39,7 +42,7 @@ class TestRunTranscription:
         input_file = tmp_path / "meeting.m4a"
         input_file.write_bytes(b"dummy audio")
 
-        with patch("whisper.load_model", return_value=make_mock_whisper()):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=make_mock_whisper()):
             with patch("subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0, stdout="10.0\n")
                 run_transcription(str(input_file))
@@ -79,7 +82,7 @@ class TestRunTranscription:
         input_file.write_bytes(b"dummy audio")
         progress_values = []
 
-        with patch("whisper.load_model", return_value=make_mock_whisper()):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=make_mock_whisper()):
             with patch("subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0, stdout="10.0\n")
                 run_transcription(
@@ -105,7 +108,7 @@ class TestRunTranscription:
         output_file = tmp_path / "audio.txt"
         output_file.write_text("old content")
 
-        with patch("whisper.load_model", return_value=make_mock_whisper()):
+        with patch("src.engine.whisper_runner.WhisperModel", return_value=make_mock_whisper()):
             with patch("subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0, stdout="10.0\n")
                 run_transcription(str(input_file), overwrite=True)

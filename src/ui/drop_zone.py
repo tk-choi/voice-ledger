@@ -2,7 +2,6 @@
 from __future__ import annotations
 import os
 from enum import Enum, auto
-from typing import Optional, Callable
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
@@ -246,7 +245,7 @@ class DropZone(QFrame):
         _, ext = os.path.splitext(file_path)
         if ext.lower() not in SUPPORTED_EXTENSIONS:
             self.set_state(DropZoneState.ERROR,
-                f"이 파일 형식은 지원하지 않습니다. .m4a 또는 .mp4 파일을 사용해 주세요.")
+                "이 파일 형식은 지원하지 않습니다. .m4a 또는 .mp4 파일을 사용해 주세요.")
             event.ignore()
             return
 
