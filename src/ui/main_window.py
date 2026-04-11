@@ -60,6 +60,22 @@ _FRIENDLY_MESSAGES: dict[str, list[str]] = {
 }
 
 
+def _notify_completion(filename: str) -> None:
+    """macOS 시스템 알림을 발송한다. 실패해도 무시."""
+    try:
+        import subprocess
+        subprocess.run(
+            [
+                "osascript", "-e",
+                f'display notification "변환 완료: {filename}" with title "Voice Ledger"',
+            ],
+            timeout=3,
+            check=False,
+        )
+    except Exception:
+        pass
+
+
 class TranscriptionWorker(QThread):
     """Engine run_transcription()을 QThread에서 실행하는 워커."""
 
@@ -270,8 +286,10 @@ class MainWindow(QMainWindow):
         self._drop_zone.file_dropped.connect(self._on_file_dropped)
         self._drop_zone.error_occurred.connect(self._show_error)
         self._cancel_btn.clicked.connect(self._on_cancel)
+        self._new_file_btn.clicked.connect(self._reset_to_idle)
         self._finder_btn.clicked.connect(self._reveal_in_finder)
         self._open_btn.clicked.connect(self._open_file)
+        self._copy_btn.clicked.connect(self._copy_result_text)
         self._retry_btn.clicked.connect(self._check_model_on_startup)
 
     # ── 키보드 단축키 ──────────────────────────────────────────
@@ -351,16 +369,43 @@ class MainWindow(QMainWindow):
     def _on_transcription_finished(self, output_path: str) -> None:
         self._stop_all_animation_timers()
         self._output_path = output_path
+
+        # 텍스트 로드
+        try:
+            with open(output_path, encoding="utf-8") as f:
+                self._result_text.setPlainText(f.read())
+        except OSError as e:
+            self._on_transcription_error(f"결과 파일을 읽을 수 없습니다: {e}")
+            return
+
+        # DropZone을 IDLE 상태로 초기화 (복귀 시 준비)
+        self._drop_zone.set_state(DropZoneState.IDLE)
+
+        # 스택 전환: DropZone → 텍스트 뷰
+        self._stack.setCurrentIndex(1)
+
+        # 진행 바 완료 표시
         self._progress_bar.setValue(100)
         p = self._palette
         self._progress_bar.setStyleSheet(
             f"QProgressBar {{ background-color: {p.progress_track()}; border-radius: 3px; }}"
             f"QProgressBar::chunk {{ background-color: {p.success()}; border-radius: 3px; }}"
         )
-        self._status_label.setText(f"완료 — {output_path}")
+
+        # 상태 레이블 숨기기
+        self._status_label.hide()
+
+        # 버튼 상태
         self._cancel_btn.hide()
+        self._new_file_btn.show()
         self._finder_btn.show()
         self._open_btn.show()
+        self._copy_btn.show()
+
+        # macOS 알림
+        _notify_completion(os.path.basename(output_path))
+
+        # 60초 후 자동 IDLE 복귀
         self._idle_timer.start(60000)
 
     def _on_transcription_cancelled(self) -> None:
@@ -394,13 +439,17 @@ class MainWindow(QMainWindow):
         self._is_cancelling = False
         self._current_stage = ""
         self._drop_zone.set_state(DropZoneState.IDLE)
+        # 스택을 DropZone 뷰로 복귀
+        self._stack.setCurrentIndex(0)
         self._progress_bar.hide()
         self._progress_bar.setValue(0)
         self._progress_bar.setStyleSheet("")
         self._status_label.hide()
         self._cancel_btn.hide()
+        self._new_file_btn.hide()
         self._finder_btn.hide()
         self._open_btn.hide()
+        self._copy_btn.hide()
         self._retry_btn.hide()
         self._output_path = None
 
@@ -497,6 +546,12 @@ class MainWindow(QMainWindow):
         if self._output_path:
             import subprocess
             subprocess.run(["open", self._output_path])
+
+    def _copy_result_text(self) -> None:
+        """결과 텍스트를 클립보드에 복사."""
+        text = self._result_text.toPlainText()
+        if text:
+            QApplication.clipboard().setText(text)
 
     # ── 모델 다운로드 ──────────────────────────────────────────
 
