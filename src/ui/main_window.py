@@ -300,7 +300,8 @@ class MainWindow(QMainWindow):
         elif event.key() == Qt.Key.Key_Period and event.modifiers() == Qt.KeyboardModifier.MetaModifier:
             self._on_cancel()
         elif event.key() == Qt.Key.Key_Escape:
-            if self._drop_zone.current_state == DropZoneState.ERROR:
+            if (self._drop_zone.current_state == DropZoneState.ERROR
+                    or self._stack.currentIndex() == 1):
                 self._reset_to_idle()
         else:
             super().keyPressEvent(event)
@@ -452,6 +453,7 @@ class MainWindow(QMainWindow):
         self._copy_btn.hide()
         self._retry_btn.hide()
         self._output_path = None
+        self._result_text.clear()
 
     def _show_error(self, message: str) -> None:
         self._drop_zone.set_state(DropZoneState.ERROR, message)
@@ -552,6 +554,8 @@ class MainWindow(QMainWindow):
         text = self._result_text.toPlainText()
         if text:
             QApplication.clipboard().setText(text)
+            self._copy_btn.setText("복사됨 ✓")
+            QTimer.singleShot(1500, lambda: self._copy_btn.setText("전체 복사"))
 
     # ── 모델 다운로드 ──────────────────────────────────────────
 
