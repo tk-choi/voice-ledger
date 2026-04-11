@@ -189,6 +189,7 @@ class MainWindow(QMainWindow):
 
         self._result_text = QTextEdit()
         self._result_text.setReadOnly(True)
+        self._result_text.setFont(self.font())  # 시스템 폰트 유지 (창과 일관된 폰트)
 
         p = self._palette
         self._result_text.setStyleSheet(
@@ -252,7 +253,6 @@ class MainWindow(QMainWindow):
         self._copy_btn = QPushButton("전체 복사")
         self._copy_btn.setFixedHeight(44)
         self._copy_btn.hide()
-        p = self._palette
         self._copy_btn.setStyleSheet(
             f"QPushButton {{ background-color: {p.accent()}; color: #1e1e2e;"
             f" border: none; border-radius: 6px; font-weight: bold; padding: 0 16px; }}"
