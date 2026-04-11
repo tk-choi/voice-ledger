@@ -269,10 +269,6 @@ class MainWindow(QMainWindow):
         self._copy_btn = QPushButton("전체 복사")
         self._copy_btn.setFixedHeight(44)
         self._copy_btn.hide()
-        self._copy_btn.setStyleSheet(
-            f"QPushButton {{ background-color: {p.accent()}; color: #1e1e2e;"
-            f" border: none; border-radius: 6px; font-weight: bold; padding: 0 16px; }}"
-        )
         bottom_layout.addWidget(self._copy_btn)
 
         self._retry_btn = QPushButton("다시 시도")
