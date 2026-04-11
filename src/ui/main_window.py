@@ -9,8 +9,10 @@ from typing import Optional
 from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
+    QApplication,
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QProgressBar, QMessageBox, QFileDialog,
+    QStackedWidget, QTextEdit,
 )
 
 from src.engine import run_transcription
@@ -182,9 +184,29 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # DropZone
+        # DropZone + 결과 텍스트 뷰 스택
         self._drop_zone = DropZone()
-        layout.addWidget(self._drop_zone, stretch=1)
+
+        self._result_text = QTextEdit()
+        self._result_text.setReadOnly(True)
+
+        p = self._palette
+        self._result_text.setStyleSheet(
+            f"QTextEdit {{"
+            f"  background-color: {p.dropzone_bg()};"
+            f"  color: {p.text_primary()};"
+            f"  border: 1px solid {p.dropzone_border()};"
+            f"  border-radius: 8px;"
+            f"  padding: 12px;"
+            f"  font-size: 12px;"
+            f"}}"
+        )
+
+        self._stack = QStackedWidget()
+        self._stack.addWidget(self._drop_zone)    # index 0 — 기본 뷰
+        self._stack.addWidget(self._result_text)  # index 1 — 결과 뷰
+
+        layout.addWidget(self._stack, stretch=1)
 
         # 진행 바
         self._progress_bar = QProgressBar()
@@ -212,6 +234,11 @@ class MainWindow(QMainWindow):
         self._cancel_btn.hide()
         bottom_layout.addWidget(self._cancel_btn)
 
+        self._new_file_btn = QPushButton("새 파일 변환")
+        self._new_file_btn.setFixedHeight(44)
+        self._new_file_btn.hide()
+        bottom_layout.addWidget(self._new_file_btn)
+
         self._finder_btn = QPushButton("Finder에서 보기")
         self._finder_btn.setFixedHeight(44)
         self._finder_btn.hide()
@@ -221,6 +248,16 @@ class MainWindow(QMainWindow):
         self._open_btn.setFixedHeight(44)
         self._open_btn.hide()
         bottom_layout.addWidget(self._open_btn)
+
+        self._copy_btn = QPushButton("전체 복사")
+        self._copy_btn.setFixedHeight(44)
+        self._copy_btn.hide()
+        p = self._palette
+        self._copy_btn.setStyleSheet(
+            f"QPushButton {{ background-color: {p.accent()}; color: #1e1e2e;"
+            f" border: none; border-radius: 6px; font-weight: bold; padding: 0 16px; }}"
+        )
+        bottom_layout.addWidget(self._copy_btn)
 
         self._retry_btn = QPushButton("다시 시도")
         self._retry_btn.setFixedHeight(44)
