@@ -245,7 +245,7 @@ class MainWindow(QMainWindow):
         elif event.key() == Qt.Key.Key_Period and event.modifiers() == Qt.KeyboardModifier.MetaModifier:
             self._on_cancel()
         elif event.key() == Qt.Key.Key_Escape:
-            if self._drop_zone.current_state in (DropZoneState.ERROR, DropZoneState.SUCCESS):
+            if self._drop_zone.current_state == DropZoneState.ERROR:
                 self._reset_to_idle()
         else:
             super().keyPressEvent(event)
@@ -314,7 +314,6 @@ class MainWindow(QMainWindow):
     def _on_transcription_finished(self, output_path: str) -> None:
         self._stop_all_animation_timers()
         self._output_path = output_path
-        self._drop_zone.set_state(DropZoneState.SUCCESS, os.path.basename(output_path))
         self._progress_bar.setValue(100)
         p = self._palette
         self._progress_bar.setStyleSheet(

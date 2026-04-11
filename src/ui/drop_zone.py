@@ -16,7 +16,6 @@ class DropZoneState(Enum):
     DRAG_HOVER = auto()
     PROCESSING = auto()
     CANCELLING = auto()
-    SUCCESS = auto()
     ERROR = auto()
     MODEL_DOWNLOAD = auto()
 
@@ -76,8 +75,6 @@ class DropZone(QFrame):
             self._apply_processing_style(message)
         elif state == DropZoneState.CANCELLING:
             self._apply_cancelling_style(message)
-        elif state == DropZoneState.SUCCESS:
-            self._apply_success_style(message)
         elif state == DropZoneState.ERROR:
             self._apply_error_style(message)
             self._error_timer.stop()
@@ -138,23 +135,6 @@ class DropZone(QFrame):
         self._main_label.setStyleSheet(f"font-size: 13px; color: {p.text_primary()};")
         self._sub_label.setText("완료될 때까지 기다려 주세요")
         self._sub_label.setStyleSheet(f"font-size: 11px; color: {p.text_secondary()};")
-        self.setAcceptDrops(False)
-
-    def _apply_success_style(self, filename: str = "") -> None:
-        p = self._palette
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {p.dropzone_bg()};
-                border: 1px solid {p.success()};
-                border-radius: 8px;
-            }}
-        """)
-        self._icon_label.setText("✓")
-        self._icon_label.setStyleSheet(f"font-size: 32px; color: {p.success()};")
-        self._main_label.setText("완료")
-        self._main_label.setStyleSheet(f"font-size: 14px; color: {p.success()};")
-        self._sub_label.setText(filename if filename else "")
-        self._sub_label.setStyleSheet(f"font-size: 12px; color: {p.text_secondary()};")
         self.setAcceptDrops(False)
 
     def _apply_error_style(self, message: str = "") -> None:
