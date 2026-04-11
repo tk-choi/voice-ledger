@@ -289,7 +289,7 @@ class MainWindow(QMainWindow):
         self._new_file_btn.clicked.connect(self._reset_to_idle)
         self._finder_btn.clicked.connect(self._reveal_in_finder)
         self._open_btn.clicked.connect(self._open_file)
-        self._copy_btn.clicked.connect(self._copy_result_text)
+        self._copy_btn.clicked.connect(self._on_copy)
         self._retry_btn.clicked.connect(self._check_model_on_startup)
 
     # ── 키보드 단축키 ──────────────────────────────────────────
@@ -354,6 +354,8 @@ class MainWindow(QMainWindow):
         self._cancel_btn.show()
         self._finder_btn.hide()
         self._open_btn.hide()
+        self._new_file_btn.hide()   # ← 추가
+        self._copy_btn.hide()       # ← 추가
 
         # 애니메이션 타이머 시작
         self._message_timer.start(3500)
@@ -451,6 +453,7 @@ class MainWindow(QMainWindow):
         self._finder_btn.hide()
         self._open_btn.hide()
         self._copy_btn.hide()
+        self._copy_btn.setText("전체 복사")  # QTimer 피드백 race condition 방지
         self._retry_btn.hide()
         self._output_path = None
         self._result_text.clear()
@@ -549,7 +552,7 @@ class MainWindow(QMainWindow):
             import subprocess
             subprocess.run(["open", self._output_path])
 
-    def _copy_result_text(self) -> None:
+    def _on_copy(self) -> None:
         """결과 텍스트를 클립보드에 복사."""
         text = self._result_text.toPlainText()
         if text:
